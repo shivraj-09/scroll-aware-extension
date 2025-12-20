@@ -1,10 +1,45 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>ScrollAware</title>
-  </head>
-  <body>
-    <h3>ScrollAware</h3>
-    <p>MVP in progress</p>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <title>ScrollAware</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <h2>ScrollAware</h2>
+    <p class="subtitle">Mindful scrolling dashboard</p>
+
+    <div class="section">
+      <label>Scroll limit</label>
+      <select id="scrollLimit">
+        <option value="3">3 minutes</option>
+        <option value="5">5 minutes</option>
+        <option value="10">10 minutes</option>
+      </select>
+    </div>
+
+    <div class="section">
+      <label>
+        <input type="checkbox" id="siteToggle" />
+        Enable on this site
+      </label>
+    </div>
+
+    <div class="section">
+      <label>
+        <input type="checkbox" id="notificationsToggle" />
+        Notifications enabled
+      </label>
+    </div>
+
+    <div class="section stats">
+      <h4>Today</h4>
+      <p>Alerts: <span id="alertsCount">0</span></p>
+      <p>Longest session: <span id="longestSession">0</span> min</p>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
 </html>
