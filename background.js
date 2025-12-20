@@ -1,5 +1,5 @@
 let cooldownUntil = 0;
-const COOLDOWN_TIME = 10 * 60 * 1000; // 10 minutes
+const COOLDOWN_TIME = 10 * 60 * 1000;
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type !== "SCROLL_LIMIT_REACHED") return;
@@ -13,6 +13,6 @@ chrome.runtime.onMessage.addListener((message) => {
     type: "basic",
     iconUrl: "icons/icon128.png",
     title: "Take a break",
-    message: "You've been scrolling for over 5 minutes. Consider taking a pause."
+    message: "You've been scrolling for over your set limit. Consider pausing."
   });
 });
