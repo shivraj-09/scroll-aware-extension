@@ -1,88 +1,129 @@
-console.log("[ScrollAware] Content script active");
+console.log("[ScrollAware] Reels-aware content script loaded");
 
-let scrollStartTime = null;
-let lastActivityTime = null;
-let alertTriggered = false;
+var sessionStartTime = null;
+var elapsedMs = 0;
+var alertTriggered = false;
+var timerInterval = null;
 
-const PAUSE_THRESHOLD = 2000; // 2 seconds
+// --- CONFIG ---
+var CHECK_INTERVAL = 1000;
 
-function getHostname() {
-  return location.hostname;
+// --- CONTEXT DETECTION ---
+function isInstagramReels() {
+  return (
+    location.hostname.includes("instagram.com") &&
+    (location.pathname.includes("/reels") ||
+     location.pathname.includes("/reel/"))
+  );
 }
 
-function isToday(dateStr) {
-  const today = new Date().toDateString();
-  return new Date(dateStr).toDateString() === today;
+function isTikTokFeed() {
+  return location.hostname.includes("tiktok.com");
 }
 
-function handleUserScrollActivity() {
-  const now = Date.now();
-
-  if (!lastActivityTime || now - lastActivityTime > PAUSE_THRESHOLD) {
-    scrollStartTime = now;
-    alertTriggered = false;
-    console.log("[ScrollAware] New scroll session started");
-  }
-
-  lastActivityTime = now;
+function isInReelsContext() {
+  return isInstagramReels() || isTikTokFeed();
 }
 
-// Capture scroll intent
-window.addEventListener("wheel", handleUserScrollActivity, { passive: true });
-window.addEventListener("touchmove", handleUserScrollActivity, { passive: true });
+// --- SESSION CONTROL ---
+function startSession() {
+  if (timerInterval) return;
 
-// Monitor scrolling duration
-setInterval(() => {
-  if (!scrollStartTime || alertTriggered) return;
+  console.log("[ScrollAware] Session started");
+  sessionStartTime = Date.now();
+  elapsedMs = 0;
+  alertTriggered = false;
+
+  timerInterval = setInterval(tick, CHECK_INTERVAL);
+}
+
+function pauseSession() {
+  if (!timerInterval) return;
+
+  console.log("[ScrollAware] Session paused");
+  clearInterval(timerInterval);
+  timerInterval = null;
+}
+
+function endSession() {
+  if (!timerInterval) return;
+
+  console.log("[ScrollAware] Session ended");
+  clearInterval(timerInterval);
+  timerInterval = null;
+  sessionStartTime = null;
+  elapsedMs = 0;
+  alertTriggered = false;
+}
+
+// --- TIMER LOOP ---
+function tick() {
+  if (document.visibilityState !== "visible") return;
+
+  elapsedMs += CHECK_INTERVAL;
 
   chrome.storage.local.get(
-    [
-      "scrollLimitMinutes",
-      "notificationsEnabled",
-      "siteEnabled",
-      "alertsToday",
-      "longestSessionMs",
-      "lastResetDate"
-    ],
-    (data) => {
-      const hostname = getHostname();
-      const siteAllowed = data.siteEnabled?.[hostname] !== false;
-      if (!siteAllowed) return;
+    ["scrollLimitMinutes", "notificationsEnabled", "siteEnabled"],
+    function (data) {
+      var siteKey = null;
+      if (location.hostname.includes("instagram.com")) siteKey = "instagram.com";
+      if (location.hostname.includes("tiktok.com")) siteKey = "tiktok.com";
 
-      const scrollLimitMs =
-        (data.scrollLimitMinutes || 5) * 60 * 1000;
+      if (!siteKey) return;
+      if (data.siteEnabled && data.siteEnabled[siteKey] === false) return;
 
-      const now = Date.now();
-      const elapsed = now - scrollStartTime;
+      var limitMinutes =
+        typeof data.scrollLimitMinutes === "number"
+          ? data.scrollLimitMinutes
+          : 5;
 
-      // Daily reset
-      if (!isToday(data.lastResetDate)) {
-        chrome.storage.local.set({
-          alertsToday: 0,
-          longestSessionMs: 0,
-          lastResetDate: new Date().toISOString()
-        });
-      }
+      var notificationsEnabled =
+        typeof data.notificationsEnabled === "boolean"
+          ? data.notificationsEnabled
+          : true;
 
-      // Track longest session
-      if (elapsed > (data.longestSessionMs || 0)) {
-        chrome.storage.local.set({
-          longestSessionMs: elapsed
-        });
-      }
+      var limitMs = limitMinutes * 60 * 1000;
 
-      // Trigger alert
-      if (elapsed >= scrollLimitMs && data.notificationsEnabled !== false) {
+      if (elapsedMs >= limitMs && notificationsEnabled && !alertTriggered) {
         alertTriggered = true;
-
-        chrome.storage.local.set({
-          alertsToday: (data.alertsToday || 0) + 1
-        });
+        console.log("[ScrollAware] Reels limit reached");
 
         chrome.runtime.sendMessage({
-          type: "SCROLL_LIMIT_REACHED"
+          type: "SCROLL_LIMIT_REACHED",
         });
       }
     }
   );
+}
+
+// --- OBSERVERS ---
+setInterval(function () {
+  if (!isInReelsContext()) {
+    endSession();
+    return;
+  }
+
+  chrome.storage.local.get(["siteEnabled"], function (data) {
+    var siteKey = null;
+    if (location.hostname.includes("instagram.com")) siteKey = "instagram.com";
+    if (location.hostname.includes("tiktok.com")) siteKey = "tiktok.com";
+
+    // If site explicitly disabled → ensure session is stopped
+    if (data.siteEnabled && data.siteEnabled[siteKey] === false) {
+      endSession();
+      return;
+    }
+
+    // Site enabled → allow session
+    startSession();
+  });
 }, 1000);
+
+
+document.addEventListener("visibilitychange", function () {
+  if (document.visibilityState === "hidden") {
+    pauseSession();
+  } else if (isInReelsContext()) {
+    startSession();
+  }
+});

@@ -41,10 +41,11 @@ document.addEventListener("DOMContentLoaded", function () {
             ? data.notificationsEnabled
             : true;
 
-        var siteAllowed =
-          !data.siteEnabled ||
-          !siteKey ||
-          data.siteEnabled[siteKey] !== false;
+        var siteAllowed = true;
+        
+        if (data.siteEnabled && data.siteEnabled.hasOwnProperty(siteKey)) {
+         siteAllowed = data.siteEnabled[siteKey];
+        }
 
         scrollLimitSelect.value = limit;
         notificationsToggle.checked = notifications;
