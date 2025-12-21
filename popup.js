@@ -1,111 +1,78 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const scrollLimitSelect = document.getElementById("scrollLimit");
-  const siteToggle = document.getElementById("siteToggle");
-  const notificationsToggle = document.getElementById("notificationsToggle");
-  const alertsCountEl = document.getElementById("alertsCount");
-  const longestSessionEl = document.getElementById("longestSession");
+document.addEventListener("DOMContentLoaded", function () {
+  var scrollLimitSelect = document.getElementById("scrollLimit");
+  var notificationsToggle = document.getElementById("notificationsToggle");
+  var siteToggle = document.getElementById("siteToggle");
 
-  // Absolute safety check
-  if (
-    !scrollLimitSelect ||
-    !siteToggle ||
-    !notificationsToggle ||
-    !alertsCountEl ||
-    !longestSessionEl
-  ) {
-    console.error("[ScrollAware] Popup DOM mismatch");
+  if (!scrollLimitSelect || !notificationsToggle || !siteToggle) {
+    console.error("Popup DOM missing");
     return;
   }
 
-  function getBaseSite(hostname) {
-    if (hostname.includes("instagram")) return "instagram.com";
-    if (hostname.includes("tiktok")) return "tiktok.com";
-    return hostname;
+  function getSiteKey(url) {
+    if (!url || typeof url !== "string") return null;
+    if (url.indexOf("instagram.com") !== -1) return "instagram.com";
+    if (url.indexOf("tiktok.com") !== -1) return "tiktok.com";
+    return null;
   }
 
-  chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-    if (
-      !tab ||
-      !tab.url ||
-      !(tab.url.startsWith("http://") || tab.url.startsWith("https://"))
-    ) {
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    var tab = tabs && tabs[0];
+    var siteKey = tab ? getSiteKey(tab.url) : null;
+
+    if (!siteKey) {
       siteToggle.disabled = true;
-      siteToggle.parentElement.style.opacity = "0.6";
-      alertsCountEl.textContent = "—";
-      longestSessionEl.textContent = "—";
-      return;
+      siteToggle.checked = false;
     }
-
-    const rawHostname = new URL(tab.url).hostname;
-    const siteKey = getBaseSite(rawHostname);
-    const isSupported =
-      siteKey === "instagram.com" || siteKey === "tiktok.com";
-
-    siteToggle.disabled = !isSupported;
-    siteToggle.parentElement.style.opacity = isSupported ? "1" : "0.6";
 
     chrome.storage.local.get(
       [
         "scrollLimitMinutes",
         "notificationsEnabled",
-        "siteEnabled",
-        "alertsToday",
-        "longestSessionMs"
+        "siteEnabled"
       ],
-      (data) => {
-        const scrollLimit =
+      function (data) {
+        var limit =
           typeof data.scrollLimitMinutes === "number"
             ? data.scrollLimitMinutes
             : 5;
 
-        const notificationsEnabled =
+        var notifications =
           typeof data.notificationsEnabled === "boolean"
             ? data.notificationsEnabled
             : true;
 
-        const siteEnabled = data.siteEnabled?.[siteKey] !== false;
+        var siteAllowed =
+          !data.siteEnabled ||
+          !siteKey ||
+          data.siteEnabled[siteKey] !== false;
 
-        scrollLimitSelect.value = scrollLimit;
-        notificationsToggle.checked = notificationsEnabled;
-        siteToggle.checked = siteEnabled;
-
-        alertsCountEl.textContent = data.alertsToday || 0;
-        longestSessionEl.textContent = Math.floor(
-          (data.longestSessionMs || 0) / 60000
-        );
-
-        // Write defaults ONCE
-        const defaults = {};
-        if (data.scrollLimitMinutes === undefined)
-          defaults.scrollLimitMinutes = 5;
-        if (data.notificationsEnabled === undefined)
-          defaults.notificationsEnabled = true;
-
-        if (Object.keys(defaults).length) {
-          chrome.storage.local.set(defaults);
-        }
+        scrollLimitSelect.value = limit;
+        notificationsToggle.checked = notifications;
+        siteToggle.checked = siteAllowed;
       }
     );
 
-    scrollLimitSelect.addEventListener("change", () => {
+    scrollLimitSelect.addEventListener("change", function () {
       chrome.storage.local.set({
         scrollLimitMinutes: Number(scrollLimitSelect.value)
       });
     });
 
-    notificationsToggle.addEventListener("change", () => {
+    notificationsToggle.addEventListener("change", function () {
       chrome.storage.local.set({
         notificationsEnabled: notificationsToggle.checked
       });
     });
 
-    siteToggle.addEventListener("change", () => {
-      chrome.storage.local.get(["siteEnabled"], (data) => {
+    siteToggle.addEventListener("change", function () {
+      if (!siteKey) return;
+
+      chrome.storage.local.get(["siteEnabled"], function (data) {
+        var updated = Object.assign({}, data.siteEnabled || {});
+        updated[siteKey] = siteToggle.checked;
+
         chrome.storage.local.set({
-          siteEnabled: {
-            ...(data.siteEnabled || {}),
-            [siteKey]: siteToggle.checked
-          }
+          siteEnabled: updated
         });
       });
     });
