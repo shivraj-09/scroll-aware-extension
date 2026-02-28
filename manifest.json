@@ -10,7 +10,8 @@
 
   "permissions": [
     "storage",
-    "notifications"
+    "notifications",
+    "tabs"
   ],
 
   "background": {

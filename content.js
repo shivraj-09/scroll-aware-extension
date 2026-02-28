@@ -1,11 +1,10 @@
 console.log("[ScrollAware] Reels-aware content script loaded");
 
-var sessionStartTime = null;
 var elapsedMs = 0;
 var alertTriggered = false;
 var timerInterval = null;
+var siteEnabled = true; // default true
 
-// --- CONFIG ---
 var CHECK_INTERVAL = 1000;
 
 // --- CONTEXT DETECTION ---
@@ -25,24 +24,21 @@ function isInReelsContext() {
   return isInstagramReels() || isTikTokFeed();
 }
 
+function getSiteKey() {
+  if (location.hostname.includes("instagram.com")) return "instagram.com";
+  if (location.hostname.includes("tiktok.com")) return "tiktok.com";
+  return null;
+}
+
 // --- SESSION CONTROL ---
 function startSession() {
-  if (timerInterval) return;
+  if (timerInterval || !siteEnabled) return;
 
   console.log("[ScrollAware] Session started");
-  sessionStartTime = Date.now();
   elapsedMs = 0;
   alertTriggered = false;
 
   timerInterval = setInterval(tick, CHECK_INTERVAL);
-}
-
-function pauseSession() {
-  if (!timerInterval) return;
-
-  console.log("[ScrollAware] Session paused");
-  clearInterval(timerInterval);
-  timerInterval = null;
 }
 
 function endSession() {
@@ -51,27 +47,20 @@ function endSession() {
   console.log("[ScrollAware] Session ended");
   clearInterval(timerInterval);
   timerInterval = null;
-  sessionStartTime = null;
   elapsedMs = 0;
   alertTriggered = false;
 }
 
-// --- TIMER LOOP ---
+// --- TIMER ---
 function tick() {
+  if (!siteEnabled) return;
   if (document.visibilityState !== "visible") return;
 
   elapsedMs += CHECK_INTERVAL;
 
   chrome.storage.local.get(
-    ["scrollLimitMinutes", "notificationsEnabled", "siteEnabled"],
+    ["scrollLimitMinutes", "notificationsEnabled"],
     function (data) {
-      var siteKey = null;
-      if (location.hostname.includes("instagram.com")) siteKey = "instagram.com";
-      if (location.hostname.includes("tiktok.com")) siteKey = "tiktok.com";
-
-      if (!siteKey) return;
-      if (data.siteEnabled && data.siteEnabled[siteKey] === false) return;
-
       var limitMinutes =
         typeof data.scrollLimitMinutes === "number"
           ? data.scrollLimitMinutes
@@ -82,11 +71,12 @@ function tick() {
           ? data.notificationsEnabled
           : true;
 
-      var limitMs = limitMinutes * 60 * 1000;
-
-      if (elapsedMs >= limitMs && notificationsEnabled && !alertTriggered) {
+      if (
+        elapsedMs >= limitMinutes * 60 * 1000 &&
+        notificationsEnabled &&
+        !alertTriggered
+      ) {
         alertTriggered = true;
-        console.log("[ScrollAware] Reels limit reached");
 
         chrome.runtime.sendMessage({
           type: "SCROLL_LIMIT_REACHED",
@@ -96,34 +86,57 @@ function tick() {
   );
 }
 
-// --- OBSERVERS ---
+// --- INITIAL LOAD OF siteEnabled ---
+chrome.storage.local.get(["siteEnabled"], function (data) {
+  var key = getSiteKey();
+  if (!key) return;
+
+  if (data.siteEnabled && typeof data.siteEnabled[key] === "boolean") {
+    siteEnabled = data.siteEnabled[key];
+  } else {
+    siteEnabled = true;
+  }
+
+  if (isInReelsContext() && siteEnabled) {
+    startSession();
+  }
+});
+
+// --- LISTEN FOR TOGGLE CHANGES ---
+chrome.storage.onChanged.addListener(function (changes, area) {
+  if (area !== "local") return;
+  if (!changes.siteEnabled) return;
+
+  var key = getSiteKey();
+  if (!key) return;
+
+  var newValue = changes.siteEnabled.newValue;
+
+  if (newValue && typeof newValue[key] === "boolean") {
+    siteEnabled = newValue[key];
+  }
+
+  if (!siteEnabled) {
+    endSession();
+  } else if (isInReelsContext()) {
+    startSession();
+  }
+});
+
+// --- CONTEXT OBSERVER ---
 setInterval(function () {
   if (!isInReelsContext()) {
     endSession();
-    return;
-  }
-
-  chrome.storage.local.get(["siteEnabled"], function (data) {
-    var siteKey = null;
-    if (location.hostname.includes("instagram.com")) siteKey = "instagram.com";
-    if (location.hostname.includes("tiktok.com")) siteKey = "tiktok.com";
-
-    // If site explicitly disabled → ensure session is stopped
-    if (data.siteEnabled && data.siteEnabled[siteKey] === false) {
-      endSession();
-      return;
-    }
-
-    // Site enabled → allow session
+  } else if (siteEnabled) {
     startSession();
-  });
+  }
 }, 1000);
 
-
+// --- VISIBILITY ---
 document.addEventListener("visibilitychange", function () {
   if (document.visibilityState === "hidden") {
-    pauseSession();
-  } else if (isInReelsContext()) {
+    endSession();
+  } else if (isInReelsContext() && siteEnabled) {
     startSession();
   }
 });
