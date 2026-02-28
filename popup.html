@@ -1,34 +1,86 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>ScrollAware</title>
+  <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <h3>ScrollAware</h3>
+  <div class="container">
+    <h1>ScrollAware</h1>
 
-  <label>
-    Scroll limit:
-    <select id="scrollLimit">
-      <option value="3">3 minutes</option>
-      <option value="5">5 minutes</option>
-      <option value="10">10 minutes</option>
-    </select>
-  </label>
+    <div id="siteInfo" class="site-info"></div>
 
-  <br /><br />
+    <!-- Progress Section -->
+    <div class="progress-section">
+      <div id="timeDisplay" class="time-display"></div>
+      <div class="progress-bar">
+        <div id="progressFill" class="progress-fill"></div>
+      </div>
+    </div>
 
-  <label>
-    <input type="checkbox" id="notificationsToggle">
-    Enable notifications
-  </label>
+    <!-- Analytics -->
+    <div class="analytics">
+      <div id="dailyUsage" class="analytics-item"></div>
+      <div id="streakDisplay" class="analytics-item"></div>
+    </div>
 
-  <br /><br />
+    <!-- DAILY LIMIT -->
+    <div class="section">
+      <label>Daily Limit</label>
+      <select id="dailyLimit">
+        <option value="5">5 minutes</option>
+        <option value="15">15 minutes</option>
+        <option value="30">30 minutes</option>
+        <option value="custom">Custom</option>
+      </select>
+      <input 
+        type="number" 
+        id="dailyCustom" 
+        placeholder="Enter minutes" 
+        min="1" 
+        style="display:none;"
+      />
+    </div>
 
-  <label>
-    <input type="checkbox" id="siteToggle">
-    Enable on this site
-  </label>
+    <!-- SESSION LIMIT -->
+    <div class="section">
+      <label>Session Limit</label>
+      <select id="sessionLimit">
+        <option value="3">3 minutes</option>
+        <option value="5">5 minutes</option>
+        <option value="10">10 minutes</option>
+        <option value="custom">Custom</option>
+      </select>
+      <input 
+        type="number" 
+        id="sessionCustom" 
+        placeholder="Enter minutes" 
+        min="1" 
+        style="display:none;"
+      />
+    </div>
+
+    <!-- NOTIFICATIONS -->
+    <div class="section toggle-row">
+      <span>Notifications</span>
+      <input type="checkbox" id="notificationsToggle" />
+    </div>
+
+    <!-- SITE ENABLE -->
+    <div class="section toggle-row">
+      <span>Enable on this site</span>
+      <input type="checkbox" id="siteToggle" />
+    </div>
+
+    <!-- HARD BLOCK -->
+    <div class="section toggle-row">
+      <span>Hard Block Mode</span>
+      <input type="checkbox" id="hardBlockToggle" />
+    </div>
+
+    <div id="status" class="status"></div>
+  </div>
 
   <script src="popup.js"></script>
 </body>
