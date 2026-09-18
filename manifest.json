@@ -23,12 +23,21 @@
   },
 
   "content_scripts": [
-    {
-      "matches": [
-        "*://*.instagram.com/*",
-        "*://*.tiktok.com/*"
-      ],
-      "js": ["content.js"]
-    }
-  ]
+  {
+    "matches": [
+      "https://www.instagram.com/*",
+      "https://www.tiktok.com/*"
+    ],
+    "run_at": "document_idle",
+    "js": [
+      "content/detection.js",
+      "content/discipline.js",
+      "content/hud.js",
+      "content/storage.js",
+      "content/overlay.js",
+      "content/timer.js",
+      "content.js"
+    ]
+  }
+]
 }
